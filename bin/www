@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+
+/**
+ * Arquivo que é executado para subir o servidor
+ */
+
+/**
+ * Dependências
+ */
+
+var app = require('../app');
+var debug = require('debug')('express-mongoose-jwt-exemplo:server');
+var http = require('http');
+var mongoose = require('mongoose');
+var chalk = require('chalk');
+
+var DB = require('../database');
+require("dotenv").config();
+
+const Pessoa = require('../database/schemas/pessoa');
+
+/**
+ * Definindo a porta em que a aplicação vai subir
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Criando o servidor
+ */
+
+var server = http.createServer(app);
+
+/**
+ * Subindo o servidor
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Função para definir a porta que a aplicação irá subir.
+ * Caso não seja fornecida uma PORT no .env a porta
+ * padrão é 3000.
+ */
+
+function normalizePort(val) {
+    var port = parseInt(val, 10);
+
+    if (isNaN(port)) {
+        // named pipe
+        return val;
+    }
+
+    if (port >= 0) {
+        // port number
+        return port;
+    }
+
+    return false;
+}
+
+/**
+ * Função executada caso haja erro ao subir o servidor
+ */
+
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    var bind = typeof port === 'string'
+        ? 'Pipe ' + port
+        : 'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+        case 'EACCES':
+            console.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            console.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
+}
+
+/**
+ * Função executada assim que o servidor terminar de subir
+ */
+
+function onListening() {
+    var addr = server.address();
+    var bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
+    console.log(`✅ Servidor up => ${bind}`);  //'\x1b[36m%s\x1b[0m' => define a cor da letra que aparece no console
+
+    /**
+     * Inicializando a conexão com o MongoDB
+     */
+    mongoose.connect(DB.DB_ADDRESS, DB.DB_OPTIONS, (err) => {
+        if (err) {
+            console.log(chalk.red(`❎ Erro na conexão com o MongoDB: ${DB.DB_ADDRESS}`));
+            console.log(chalk.red(`❎ ${err.message}`));
+        }
+        else {
+            console.log(chalk.white(`✅ Servidor conectado ao MongoDB: ${DB.DB_ADDRESS}`));
+
+            if (process.env.RECREATE_DB == 'true') {
+                recriarBD();
+            }
+        }
+    });
+}
+
+/**
+ * Função que faz um drop no MongoDB sempre que a aplicação sobe
+ */
+async function recriarBD() {
+    //Dropando BD
+    console.log(chalk.white(`⚡ Recriando BD: ${DB.DB_ADDRESS}/${DB.DB_OPTIONS.dbName}`));
+
+    mongoose.connect(DB.DB_ADDRESS, DB.DB_OPTIONS, (err) => {
+        mongoose.connection.db.dropDatabase()
+            .then((result) => {
+                console.log(chalk.white(`✅ BD recriado: ${DB.DB_ADDRESS}/${DB.DB_OPTIONS.dbName}`));
+
+                let pessoa = {
+                    acesso: {
+                        senha: 'admin',
+                        usuario: 'admin'
+                    }
+                };
+                Pessoa.create(pessoa)
+                    .then(result => {
+                        console.log(chalk.white(`✅ 'admin' criado com sucesso!`));
+                    })
+                    .catch(err => {
+                        console.log(chalk.red(`❎ Erro ao criar 'admin': ${error}`));
+                    });
+            })
+            .catch((err) => {
+                console.log(chalk.red(`❎ Erro ao excluir o BD: ${DB.DB_ADDRESS}/${DB.DB_OPTIONS.dbName}`));
+            });
+    });
+}
