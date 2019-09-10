@@ -19,9 +19,9 @@ const Pessoa = new Schema(
             usuario: { type: String, required: true, unique: true },
             senha: { type: String, default: 'miojo123' },
             ultimoLogin: { type: Date, default: null }
-        },
-        criadoEm: { type: Date, default: Date.now }
-    }
+        }
+    },
+    { timestamps: true } /* Com esse campo, o mongoose é capaz de gerenciar os campos 'createdAt' e 'updatedAt' */
 )
 
 module.exports = mongoose.model('Pessoa', Pessoa);
